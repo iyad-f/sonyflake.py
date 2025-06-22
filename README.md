@@ -2,7 +2,7 @@
 
 Sonyflake is a distributed unique ID generator inspired by [Twitter's Snoflake](https://blog.twitter.com/2010/announcing-snowflake).
 
-This is a python rewrite of the original [sony/sonyflake](https:github.com/sony/sonyflake) project, written in Go.
+This is a python rewrite of the original [sony/sonyflake](https://github.com/sony/sonyflake) project, written in Go.
 
 Sonyflake focuses on lifetime and performance on many host/core environment. So it has a different bit assignment from Snowflake. By default, a Sonyflake ID is composed of
 
