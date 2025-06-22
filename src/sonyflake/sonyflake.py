@@ -118,15 +118,15 @@ class OverTimeLimit(SonyflakeError):
 
 
 class NoPrivateAddress(SonyflakeError):
-    """NoPrivateAddress."""
+    """Raised when no private IPv4 address could be determined."""
 
     def __init__(self) -> None:
-        msg = "no private ip address"
+        msg = "failed to determine private IPv4 address."
         super().__init__(msg)
 
 
 class DecomposedSonyflake(NamedTuple):
-    """Decomposed Sonyflake."""
+    """Represents a decomposed Sonyflake."""
 
     id: int
     time: int
