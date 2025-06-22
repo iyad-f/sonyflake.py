@@ -354,7 +354,36 @@ class _BaseSonyflake:
 
 
 class Sonyflake(_BaseSonyflake):
-    """Sonyflake."""
+    """A distributed unique ID generator.
+
+    Parameters
+    ----------
+    bits_sequence : int, optional
+        Number of bits allocated for the sequence number (the default is `8`).
+    bits_machine_id : int, optional
+        Number of bits allocated for the machine ID (the default is `16`).
+    time_unit : datetime.timedelta, optional
+        Minimum time unit used for incrementing IDs (the default is 10 milliseconds).
+    start_time : datetime.datetime, optional
+        The custom epoch from which time is measured (the default is current UTC time).
+    machine_id : int, optional
+        Custom machine ID to use (the default is the lower 16 bits of the machine's private IP address).
+    check_machine_id : Callable[[int], bool], optional
+        Function to validate the generated or provided machine ID (the default is `None`, which disables validation).
+
+    Raises
+    ------
+    InvalidBitsSequence
+        If the provided bit length for the sequence number is invalid.
+    InvalidBitsMachineID
+        If the provided bit length for the machine ID is invalid.
+    InvalidTimeUnit
+        If the time unit is smaller than 1 millisecond.
+    InvalidMachineID
+        If the provided or generated machine ID is invalid.
+    StartTimeAhead
+        If the start time is set in the future.
+    """
 
     __slots__ = ("_lock",)
 
@@ -382,7 +411,18 @@ class Sonyflake(_BaseSonyflake):
         self._lock = threading.Lock()
 
     def next_id(self) -> int:
-        """Return the next id."""
+        """Return the next unique id.
+
+        Returns
+        -------
+        int
+            A 64-bit Sonyflake ID.
+
+        Raises
+        ------
+        OverTimeLimit
+            If the elapsed time exceeds the maximum representable value.
+        """
         mask_sequence = (1 << self._bits_sequence) - 1
 
         with self._lock:
@@ -408,7 +448,38 @@ class Sonyflake(_BaseSonyflake):
 
 
 class AsyncSonyflake(_BaseSonyflake):
-    """Async Sonyflake."""
+    """An asynchronous distributed unique ID generator.
+
+    This variant of Sonyflake is designed for use in asynchronous applications.
+
+    Parameters
+    ----------
+    bits_sequence : int, optional
+        Number of bits allocated for the sequence number (the default is `8`).
+    bits_machine_id : int, optional
+        Number of bits allocated for the machine ID (the default is `16`).
+    time_unit : datetime.timedelta, optional
+        Minimum time unit used for incrementing IDs (the default is 10 milliseconds).
+    start_time : datetime.datetime, optional
+        The custom epoch from which time is measured (the default is current UTC time).
+    machine_id : int, optional
+        Custom machine ID to use (the default is the lower 16 bits of the machine's private IP address).
+    check_machine_id : Callable[[int], bool], optional
+        Function to validate the generated or provided machine ID (the default is `None`, which disables validation).
+
+    Raises
+    ------
+    InvalidBitsSequence
+        If the provided bit length for the sequence number is invalid.
+    InvalidBitsMachineID
+        If the provided bit length for the machine ID is invalid.
+    InvalidTimeUnit
+        If the time unit is smaller than 1 millisecond.
+    InvalidMachineID
+        If the provided or generated machine ID is invalid.
+    StartTimeAhead
+        If the start time is set in the future.
+    """
 
     __slots__ = ("_lock",)
 
@@ -436,7 +507,18 @@ class AsyncSonyflake(_BaseSonyflake):
         self._lock = asyncio.Lock()
 
     async def next_id(self) -> int:
-        """Return the next id."""
+        """Return the next unique id.
+
+        Returns
+        -------
+        int
+            A 64-bit Sonyflake ID.
+
+        Raises
+        ------
+        OverTimeLimit
+            If the elapsed time exceeds the maximum representable value.
+        """
         mask_sequence = (1 << self._bits_sequence) - 1
 
         async with self._lock:
