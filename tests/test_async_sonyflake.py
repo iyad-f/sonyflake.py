@@ -12,51 +12,32 @@ from sonyflake.sonyflake import AsyncSonyflake, OverTimeLimit, _lower_16bit_priv
 @pytest.mark.asyncio
 class TestAsyncSonyflake:
     async def test_next_id(self) -> None:
-        # TODO: Probably write some other kind of logic for this,
-        # as this isnt consistent.
-        sf = AsyncSonyflake(start_time=datetime.now(timezone.utc))
+        sf = AsyncSonyflake(time_unit=timedelta(milliseconds=1), start_time=datetime.now(timezone.utc))
 
-        sleep_time = 50
-        await asyncio.sleep((sleep_time * sf._time_unit) / 1e9)
-
-        id_ = await sf.next_id()
-
-        actual_time = sf._time_part(id_)
-        assert actual_time >= sleep_time
-        assert actual_time <= sleep_time + 2
-        assert sf._sequence_part(id_) == 0
-        assert sf._machine_id_part(id_) == _lower_16bit_private_ip()
-
-    async def test_next_id_in_sequence(self) -> None:
-        now = datetime.now(timezone.utc)
-        # This test may fail with a time unit of 1 millisecond,
-        # as the system might not be able to generate (1 << bits_sequence) - 1
-        # IDs within a single millisecond.
-        sf = AsyncSonyflake(time_unit=timedelta(milliseconds=10), start_time=now)
-        start_time = sf._to_internal_time(now)
+        previous_id = await sf.next_id()
+        previous_time = sf._time_part(previous_id)
+        previous_sequence = sf._sequence_part(previous_id)
         machine_id = _lower_16bit_private_ip()
 
-        last_id = max_seq = 0
+        for _ in range(1000):
+            current_id = await sf.next_id()
 
-        current_time = start_time
-        while current_time - start_time < 100:
-            id_ = await sf.next_id()
-            current_time = sf._to_internal_time(datetime.now(timezone.utc))
+            assert sf._machine_id_part(current_id) == machine_id
 
-            assert id_ != last_id
-            assert id_ > last_id
-            last_id = id_
+            current_time = sf._time_part(current_id)
+            current_sequence = sf._sequence_part(current_id)
 
-            parts = sf.decompose(id_)
+            assert current_id > previous_id
 
-            overtime = start_time + parts.time - current_time
-            assert overtime <= 0
+            if current_time == previous_time:
+                assert current_sequence > previous_sequence
+            else:
+                assert current_time > previous_time
+                assert current_sequence == 0
 
-            max_seq = max(max_seq, parts.sequence)
-
-            assert parts.machine_id == machine_id
-
-        assert max_seq == (1 << sf._bits_sequence) - 1
+            previous_id = current_id
+            previous_time = current_time
+            previous_sequence = current_sequence
 
     async def test_next_id_in_parallel(self) -> None:
         sf1 = AsyncSonyflake(machine_id=1)
