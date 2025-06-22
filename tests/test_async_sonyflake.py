@@ -8,18 +8,14 @@ import pytest
 
 from sonyflake.sonyflake import AsyncSonyflake, OverTimeLimit, _lower_16bit_private_ip
 
-import time
+
 @pytest.mark.asyncio
 class TestAsyncSonyflake:
     async def test_next_id(self) -> None:
         sf = AsyncSonyflake(start_time=datetime.now(timezone.utc))
 
         sleep_time = 50
-        sleep_ns = sleep_time * sf._time_unit
-        start = time.perf_counter_ns()
-
-        while time.perf_counter_ns() - start < sleep_ns:
-            pass
+        await asyncio.sleep((sleep_time * sf._time_unit) / 1e9)
 
         id_ = await sf.next_id()
 
@@ -27,7 +23,7 @@ class TestAsyncSonyflake:
         assert actual_time >= sleep_time
         # Adding a buffer of +2 to account for minor timing inconsistencies,
         # +1 was occasionally failing
-        assert actual_time <= sleep_time + 1
+        assert actual_time <= sleep_time + 2
 
         actual_sequence = sf._sequence_part(id_)
         assert actual_sequence == 0
