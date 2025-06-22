@@ -20,6 +20,10 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Topic :: Internet",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Distributed Computing",
 ]
 dynamic = ["version"]
 dependencies = []
@@ -30,7 +34,6 @@ Issues = "https://github.com/iyad-f/sonyflake.py/issues"
 Repository = "https://github.com/iyad-f/sonyflake.py"
 
 [dependency-groups]
-dev = []
 lint = [
     "ruff>=0.12.0",
 ]
