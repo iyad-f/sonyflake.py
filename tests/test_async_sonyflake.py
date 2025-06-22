@@ -12,6 +12,8 @@ from sonyflake.sonyflake import AsyncSonyflake, OverTimeLimit, _lower_16bit_priv
 @pytest.mark.asyncio
 class TestAsyncSonyflake:
     async def test_next_id(self) -> None:
+        # TODO: Probably write some other kind of logic for this,
+        # as this isnt consistent.
         sf = AsyncSonyflake(start_time=datetime.now(timezone.utc))
 
         sleep_time = 50
@@ -21,18 +23,15 @@ class TestAsyncSonyflake:
 
         actual_time = sf._time_part(id_)
         assert actual_time >= sleep_time
-        # Adding a buffer of +2 to account for minor timing inconsistencies,
-        # +1 was occasionally failing
         assert actual_time <= sleep_time + 2
-
-        actual_sequence = sf._sequence_part(id_)
-        assert actual_sequence == 0
-
-        actual_machine_id = sf._machine_id_part(id_)
-        assert actual_machine_id == _lower_16bit_private_ip()
+        assert sf._sequence_part(id_) == 0
+        assert sf._machine_id_part(id_) == _lower_16bit_private_ip()
 
     async def test_next_id_in_sequence(self) -> None:
         now = datetime.now(timezone.utc)
+        # This test may fail with a time unit of 1 millisecond,
+        # as the system might not be able to generate (1 << bits_sequence) - 1
+        # IDs within a single millisecond.
         sf = AsyncSonyflake(time_unit=timedelta(milliseconds=10), start_time=now)
         start_time = sf._to_internal_time(now)
         machine_id = _lower_16bit_private_ip()
@@ -64,41 +63,31 @@ class TestAsyncSonyflake:
         sf2 = AsyncSonyflake(machine_id=2)
 
         num_cpus = os.cpu_count() or 8
-        num_id = 1000
+        num_ids = 1000
         ids: set[int] = set()
-        lock = asyncio.Lock()
 
-        async def generate_ids(sf: AsyncSonyflake) -> None:
-            for _ in range(num_id):
-                id_ = await sf.next_id()
-                async with lock:
-                    assert id_ not in ids
-                    ids.add(id_)
+        async def generate_ids(sf: AsyncSonyflake) -> list[int]:
+            return [await sf.next_id() for _ in range(num_ids)]
 
-        await asyncio.gather(
-            *[
-                asyncio.gather(
-                    generate_ids(sf1),
-                    generate_ids(sf2),
-                )
-                for _ in range(num_cpus // 2)
-            ]
-        )
+        tasks: list[asyncio.Task[list[int]]] = []
+        for _ in range(num_cpus // 2):
+            tasks.append(asyncio.create_task(generate_ids(sf1)))
+            tasks.append(asyncio.create_task(generate_ids(sf2)))
 
-    @staticmethod
-    def _pseudo_sleep(sf: AsyncSonyflake, period: timedelta) -> None:
-        ticks = int(period.total_seconds() * 1e9) // sf._time_unit
-        sf._start_time -= ticks
+        for coro in asyncio.as_completed(tasks):
+            result = await coro
+            for id_ in result:
+                assert id_ not in ids
+                ids.add(id_)
 
     async def test_next_id_raises_error(self) -> None:
         sf = AsyncSonyflake(start_time=datetime.now(timezone.utc))
+        ticks_per_year = int(365 * 24 * 60 * 60 * 1e9) // sf._time_unit
 
-        year = timedelta(days=365)
-        self._pseudo_sleep(sf, 174 * year)
+        sf._start_time -= 174 * ticks_per_year
         await sf.next_id()
 
-        self._pseudo_sleep(sf, 1 * year)
-
+        sf._start_time -= 1 * ticks_per_year
         with pytest.raises(OverTimeLimit):
             await sf.next_id()
 

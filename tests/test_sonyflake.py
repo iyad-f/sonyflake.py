@@ -16,6 +16,8 @@ if TYPE_CHECKING:
 
 class TestSonyflake:
     def test_next_id(self) -> None:
+        # TODO: Probably write some other kind of logic for this,
+        # as this isnt consistent.
         sf = Sonyflake(start_time=datetime.now(timezone.utc))
 
         sleep_time = 50
@@ -25,18 +27,15 @@ class TestSonyflake:
 
         actual_time = sf._time_part(id_)
         assert actual_time >= sleep_time
-        # Adding a buffer of +2 to account for minor timing inconsistencies,
-        # +1 was occasionally failing
         assert actual_time <= sleep_time + 2
-
-        actual_sequence = sf._sequence_part(id_)
-        assert actual_sequence == 0
-
-        actual_machine_id = sf._machine_id_part(id_)
-        assert actual_machine_id == _lower_16bit_private_ip()
+        assert sf._sequence_part(id_) == 0
+        assert sf._machine_id_part(id_) == _lower_16bit_private_ip()
 
     def test_next_id_in_sequence(self) -> None:
         now = datetime.now(timezone.utc)
+        # This test may fail with a time unit of 1 millisecond,
+        # as the system might not be able to generate (1 << bits_sequence) - 1
+        # IDs within a single millisecond.
         sf = Sonyflake(time_unit=timedelta(milliseconds=10), start_time=now)
         start_time = sf._to_internal_time(now)
         machine_id = _lower_16bit_private_ip()
@@ -67,7 +66,7 @@ class TestSonyflake:
         sf1 = Sonyflake(machine_id=1)
         sf2 = Sonyflake(machine_id=2)
 
-        num_cpus = os.cpu_count() or 8  # fallback to 8 if None
+        num_cpus = os.cpu_count() or 8
         num_id = 1000
         ids: set[int] = set()
 
@@ -85,20 +84,14 @@ class TestSonyflake:
                     assert id_ not in ids
                     ids.add(id_)
 
-    @staticmethod
-    def _pseudo_sleep(sf: Sonyflake, period: timedelta) -> None:
-        ticks = int(period.total_seconds() * 1e9) // sf._time_unit
-        sf._start_time -= ticks
-
     def test_next_id_raises_error(self) -> None:
         sf = Sonyflake(start_time=datetime.now(timezone.utc))
+        ticks_per_year = int(365 * 24 * 60 * 60 * 1e9) // sf._time_unit
 
-        year = timedelta(days=365)
-        self._pseudo_sleep(sf, 174 * year)
+        sf._start_time -= 174 * ticks_per_year
         sf.next_id()
 
-        self._pseudo_sleep(sf, 1 * year)
-
+        sf._start_time -= 1 * ticks_per_year
         with pytest.raises(OverTimeLimit):
             sf.next_id()
 
