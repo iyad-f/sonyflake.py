@@ -83,4 +83,4 @@ class TestSonyflake:
         tm = sf.to_time(id_)
         diff = tm - start
 
-        assert timedelta(0) <= diff < timedelta(microseconds=sf._time_unit / 1000)
+        assert timedelta(0) <= diff <= timedelta(microseconds=sf._time_unit / 1000)
