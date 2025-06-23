@@ -74,7 +74,7 @@ class TestAsyncSonyflake:
 
     async def test_to_time(self) -> None:
         start = datetime.now(timezone.utc)
-        sf = AsyncSonyflake(time_unit=timedelta(milliseconds=1), start_time=start)
+        sf = AsyncSonyflake(time_unit=timedelta(milliseconds=100), start_time=start)
 
         id_ = await sf.next_id()
 

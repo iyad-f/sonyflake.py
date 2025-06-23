@@ -77,7 +77,7 @@ class TestSonyflake:
 
     def test_to_time(self) -> None:
         start = datetime.now(timezone.utc)
-        sf = Sonyflake(time_unit=timedelta(milliseconds=1), start_time=start)
+        sf = Sonyflake(time_unit=timedelta(milliseconds=100), start_time=start)
 
         id_ = sf.next_id()
         tm = sf.to_time(id_)
