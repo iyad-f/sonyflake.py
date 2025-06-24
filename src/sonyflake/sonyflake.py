@@ -21,7 +21,7 @@ import ipaddress
 import socket
 import threading
 import time
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING, NamedTuple, NotRequired, TypedDict, Unpack
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -155,7 +155,16 @@ def _lower_16bit_private_ip() -> int:
 
 
 def _utcnow() -> datetime.datetime:
-    return datetime.datetime.now(datetime.timezone.utc)
+    return datetime.datetime.now(datetime.UTC)
+
+
+class SonyflakeOptions(TypedDict):
+    bits_sequence: NotRequired[int]
+    bits_machine_id: NotRequired[int]
+    time_unit: NotRequired[datetime.timedelta]
+    start_time: datetime.datetime
+    machine_id: NotRequired[int]
+    check_machine_id: NotRequired[Callable[[int], bool]]
 
 
 class _BaseSonyflake:
@@ -179,19 +188,12 @@ class _BaseSonyflake:
     _sequence: int
     _machine_id: int
 
-    def __init__(
-        self,
-        *,
-        bits_sequence: int = DEFAULT_BITS_SEQUENCE,
-        bits_machine_id: int = DEFAULT_BITS_MACHINE_ID,
-        time_unit: datetime.timedelta | None = None,
-        start_time: datetime.datetime | None = None,
-        machine_id: int | None = None,
-        check_machine_id: Callable[[int], bool] | None = None,
-    ) -> None:
+    def __init__(self, **options: Unpack[SonyflakeOptions]) -> None:
+        bits_sequence = options.pop("bits_sequence", DEFAULT_BITS_SEQUENCE)
         if not 0 <= bits_sequence <= 30:
             raise InvalidBitsSequence
 
+        bits_machine_id = options.pop("bits_machine_id", DEFAULT_BITS_MACHINE_ID)
         if not 0 <= bits_machine_id <= 30:
             raise InvalidBitsMachineID
 
@@ -203,17 +205,23 @@ class _BaseSonyflake:
         self._bits_machine_id = bits_machine_id
         self._bits_time = bits_time
 
-        if time_unit is None:
+        try:
+            time_unit = options.pop("time_unit")
+        except KeyError:
             self._time_unit = DEFAULT_TIME_UNIT
-        elif time_unit >= datetime.timedelta(milliseconds=1):
-            self._time_unit = int(time_unit.total_seconds() * 1e9)
         else:
-            raise InvalidTimeUnit
+            if time_unit < datetime.timedelta(milliseconds=1):
+                raise InvalidTimeUnit
 
-        if start_time is None:
-            start_time = datetime.datetime(2025, 1, 1, 0, 0, 0, 0, datetime.timezone.utc)
+            self._time_unit = int(time_unit.total_seconds() * 1e9)
+
+        try:
+            start_time = options["start_time"]
+        except KeyError:
+            msg = "'start_time' is required"
+            raise ValueError(msg) from None
         else:
-            start_time = start_time.astimezone(datetime.timezone.utc)
+            start_time = start_time.astimezone(datetime.UTC)
             if start_time > _utcnow():
                 raise StartTimeAhead
 
@@ -222,15 +230,22 @@ class _BaseSonyflake:
 
         self._sequence = (1 << self._bits_sequence) - 1
 
-        if machine_id is None:
+        try:
+            machine_id = options.pop("machine_id")
+        except KeyError:
             machine_id = _lower_16bit_private_ip()
 
         if not 0 <= machine_id < (1 << bits_machine_id):
             raise InvalidMachineID
 
-        if check_machine_id is not None and not check_machine_id(machine_id):
-            msg = "machine id check failed"
-            raise InvalidMachineID(msg)
+        try:
+            check_machine_id = options.pop("check_machine_id")
+        except KeyError:
+            pass
+        else:
+            if not check_machine_id(machine_id):
+                msg = "machine id check failed"
+                raise InvalidMachineID(msg)
 
         self._machine_id = machine_id
 
@@ -267,7 +282,7 @@ class _BaseSonyflake:
             The UTC datetime corresponding to the given ID.
         """
         ns = (self._start_time + self._time_part(sonyflake_id)) * self._time_unit
-        return datetime.datetime.fromtimestamp(ns / 1e9, tz=datetime.timezone.utc)
+        return datetime.datetime.fromtimestamp(ns / 1e9, tz=datetime.UTC)
 
     def compose(self, dt: datetime.datetime, sequence: int, machine_id: int) -> int:
         """
@@ -364,8 +379,8 @@ class Sonyflake(_BaseSonyflake):
         Number of bits allocated for the machine ID (the default is `16`).
     time_unit : datetime.timedelta, optional
         Minimum time unit used for incrementing IDs (the default is 10 milliseconds).
-    start_time : datetime.datetime, optional
-        The custom epoch from which time is measured (the default is current UTC time).
+    start_time : datetime.datetime
+        The custom epoch from which time is measured.
     machine_id : int, optional
         Custom machine ID to use (the default is the lower 16 bits of the machine's private IP address).
     check_machine_id : Callable[[int], bool], optional
@@ -389,25 +404,8 @@ class Sonyflake(_BaseSonyflake):
 
     _lock: threading.Lock
 
-    def __init__(
-        self,
-        *,
-        bits_sequence: int = DEFAULT_BITS_SEQUENCE,
-        bits_machine_id: int = DEFAULT_BITS_MACHINE_ID,
-        time_unit: datetime.timedelta | None = None,
-        start_time: datetime.datetime | None = None,
-        machine_id: int | None = None,
-        check_machine_id: Callable[[int], bool] | None = None,
-    ) -> None:
-        super().__init__(
-            bits_sequence=bits_sequence,
-            bits_machine_id=bits_machine_id,
-            time_unit=time_unit,
-            start_time=start_time,
-            machine_id=machine_id,
-            check_machine_id=check_machine_id,
-        )
-
+    def __init__(self, **options: Unpack[SonyflakeOptions]) -> None:
+        super().__init__(**options)
         self._lock = threading.Lock()
 
     def next_id(self) -> int:
@@ -460,8 +458,8 @@ class AsyncSonyflake(_BaseSonyflake):
         Number of bits allocated for the machine ID (the default is `16`).
     time_unit : datetime.timedelta, optional
         Minimum time unit used for incrementing IDs (the default is 10 milliseconds).
-    start_time : datetime.datetime, optional
-        The custom epoch from which time is measured (the default is current UTC time).
+    start_time : datetime.datetime
+        The custom epoch from which time is measured.
     machine_id : int, optional
         Custom machine ID to use (the default is the lower 16 bits of the machine's private IP address).
     check_machine_id : Callable[[int], bool], optional
@@ -485,25 +483,8 @@ class AsyncSonyflake(_BaseSonyflake):
 
     _lock: asyncio.Lock
 
-    def __init__(
-        self,
-        *,
-        bits_sequence: int = DEFAULT_BITS_SEQUENCE,
-        bits_machine_id: int = DEFAULT_BITS_MACHINE_ID,
-        time_unit: datetime.timedelta | None = None,
-        start_time: datetime.datetime | None = None,
-        machine_id: int | None = None,
-        check_machine_id: Callable[[int], bool] | None = None,
-    ) -> None:
-        super().__init__(
-            bits_sequence=bits_sequence,
-            bits_machine_id=bits_machine_id,
-            time_unit=time_unit,
-            start_time=start_time,
-            machine_id=machine_id,
-            check_machine_id=check_machine_id,
-        )
-
+    def __init__(self, **options: Unpack[SonyflakeOptions]) -> None:
+        super().__init__(**options)
         self._lock = asyncio.Lock()
 
     async def next_id(self) -> int:

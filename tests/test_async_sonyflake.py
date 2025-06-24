@@ -1,8 +1,10 @@
+# pyright: reportPrivateUsage=false
+
 from __future__ import annotations
 
 import asyncio
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -12,7 +14,7 @@ from sonyflake.sonyflake import AsyncSonyflake, OverTimeLimit, _lower_16bit_priv
 @pytest.mark.asyncio
 class TestAsyncSonyflake:
     async def test_next_id(self) -> None:
-        sf = AsyncSonyflake(time_unit=timedelta(milliseconds=1), start_time=datetime.now(timezone.utc))
+        sf = AsyncSonyflake(time_unit=timedelta(milliseconds=1), start_time=datetime.now(UTC))
 
         previous_id = await sf.next_id()
         previous_time = sf._time_part(previous_id)
@@ -40,8 +42,9 @@ class TestAsyncSonyflake:
             previous_sequence = current_sequence
 
     async def test_next_id_in_parallel(self) -> None:
-        sf1 = AsyncSonyflake(machine_id=1)
-        sf2 = AsyncSonyflake(machine_id=2)
+        start_time = datetime.now(UTC)
+        sf1 = AsyncSonyflake(machine_id=1, start_time=start_time)
+        sf2 = AsyncSonyflake(machine_id=2, start_time=start_time)
 
         num_cpus = os.cpu_count() or 8
         num_ids = 1000
@@ -62,7 +65,7 @@ class TestAsyncSonyflake:
                 ids.add(id_)
 
     async def test_next_id_raises_error(self) -> None:
-        sf = AsyncSonyflake(start_time=datetime.now(timezone.utc))
+        sf = AsyncSonyflake(start_time=datetime.now(UTC))
         ticks_per_year = int(365 * 24 * 60 * 60 * 1e9) // sf._time_unit
 
         sf._start_time -= 174 * ticks_per_year
@@ -73,7 +76,7 @@ class TestAsyncSonyflake:
             await sf.next_id()
 
     async def test_to_time(self) -> None:
-        start = datetime.now(timezone.utc)
+        start = datetime.now(UTC)
         sf = AsyncSonyflake(time_unit=timedelta(milliseconds=100), start_time=start)
 
         id_ = await sf.next_id()

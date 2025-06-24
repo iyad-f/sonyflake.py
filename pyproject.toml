@@ -73,14 +73,9 @@ exclude = [
     "build",
     "dist",
     "docs",
-    "tests"
 ]
-# uncomment after tests are complelty done.
-# ignore = [
-#     "tests"
-# ]
 
-pythonVersion = "3.10"
+pythonVersion = "3.11"
 pythonPlatform = "All"
 typeCheckingMode = "strict"
 analyzeUnannotatedFunctions = true
@@ -177,7 +172,7 @@ reportUnusedCallResult = "none"
 
 [tool.ruff]
 line-length = 125
-target-version = "py310"
+target-version = "py311"
 exclude = ["docs/"]
 
 [tool.ruff.format]

@@ -130,7 +130,6 @@ tests = [
 [package.metadata]
 
 [package.metadata.requires-dev]
-dev = []
 lint = [{ name = "ruff", specifier = ">=0.12.0" }]
 tests = [
     { name = "pytest", specifier = ">=8.4.1" },

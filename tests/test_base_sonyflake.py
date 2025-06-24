@@ -1,7 +1,9 @@
+# pyright: reportPrivateUsage=false
+
 from __future__ import annotations
 
 import ipaddress
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 import pytest
@@ -28,35 +30,35 @@ if TYPE_CHECKING:
 class TestBaseSonyflake:
     def test_invalid_bits_time(self) -> None:
         with pytest.raises(InvalidBitsTime):
-            _BaseSonyflake(bits_sequence=16, bits_machine_id=16)
+            _BaseSonyflake(bits_sequence=16, bits_machine_id=16, start_time=datetime.now(UTC))
 
     def test_invalid_bits_sequence(self) -> None:
         with pytest.raises(InvalidBitsSequence):
-            _BaseSonyflake(bits_sequence=-1)
+            _BaseSonyflake(bits_sequence=-1, start_time=datetime.now(UTC))
 
     def test_invalid_bits_machine_id(self) -> None:
         with pytest.raises(InvalidBitsMachineID):
-            _BaseSonyflake(bits_machine_id=31)
+            _BaseSonyflake(bits_machine_id=31, start_time=datetime.now(UTC))
 
     def test_invalid_time_unit(self) -> None:
         with pytest.raises(InvalidTimeUnit):
-            _BaseSonyflake(time_unit=timedelta(microseconds=1))
+            _BaseSonyflake(time_unit=timedelta(microseconds=1), start_time=datetime.now(UTC))
 
     def test_start_time_ahead(self) -> None:
         with pytest.raises(StartTimeAhead):
-            _BaseSonyflake(start_time=datetime.now(timezone.utc) + timedelta(minutes=1))
+            _BaseSonyflake(start_time=datetime.now(UTC) + timedelta(minutes=1))
 
     def test_too_large_machine_id(self) -> None:
         with pytest.raises(InvalidMachineID):
-            _BaseSonyflake(machine_id=1 << DEFAULT_BITS_MACHINE_ID)
+            _BaseSonyflake(machine_id=1 << DEFAULT_BITS_MACHINE_ID, start_time=datetime.now(UTC))
 
     def test_negative_machine_id(self) -> None:
         with pytest.raises(InvalidMachineID):
-            _BaseSonyflake(machine_id=-1)
+            _BaseSonyflake(machine_id=-1, start_time=datetime.now(UTC))
 
     def test_invalid_machine_id(self) -> None:
         with pytest.raises(InvalidMachineID):
-            _BaseSonyflake(check_machine_id=lambda _: False)
+            _BaseSonyflake(check_machine_id=lambda _: False, start_time=datetime.now(UTC))
 
     def test_pick_private_ip_single_valid_private(self) -> None:
         ips = ["192.168.0.1"]
@@ -93,7 +95,7 @@ class TestBaseSonyflake:
         assert parts.id == id_
 
     def test_compose_and_decompose_zero_values(self) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sf = _BaseSonyflake(time_unit=timedelta(milliseconds=1), start_time=now)
 
         id_ = sf.compose(now, 0, 0)
@@ -103,7 +105,7 @@ class TestBaseSonyflake:
         self._compose_and_decompose_assertions(parts, expected_time, 0, 0, id_)
 
     def test_compose_and_decompose_max_sequence(self) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sf = _BaseSonyflake(time_unit=timedelta(milliseconds=1), start_time=now)
 
         max_sequence = (1 << sf._bits_sequence) - 1
@@ -114,7 +116,7 @@ class TestBaseSonyflake:
         self._compose_and_decompose_assertions(parts, expected_time, max_sequence, 0, id_)
 
     def test_compose_and_decompose_max_machine_id(self) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sf = _BaseSonyflake(time_unit=timedelta(milliseconds=1), start_time=now)
 
         max_machine_id = (1 << sf._bits_machine_id) - 1
@@ -125,7 +127,7 @@ class TestBaseSonyflake:
         self._compose_and_decompose_assertions(parts, expected_time, 0, max_machine_id, id_)
 
     def test_compose_and_decompose_future_time(self) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         future_time = now + timedelta(hours=1)
         sf = _BaseSonyflake(time_unit=timedelta(milliseconds=1), start_time=now)
 
@@ -136,14 +138,14 @@ class TestBaseSonyflake:
         self._compose_and_decompose_assertions(parts, expected_time, 0, 0, id_)
 
     def test_compose_start_time_ahead(self) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sf = _BaseSonyflake(start_time=now)
 
         with pytest.raises(StartTimeAhead):
             sf.compose(now - timedelta(seconds=1), 0, 0)
 
     def test_compose_over_time_limit(self) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sf = _BaseSonyflake(start_time=now, time_unit=timedelta(milliseconds=1))
 
         future_time = now + timedelta(days=365 * 175)
@@ -151,7 +153,7 @@ class TestBaseSonyflake:
             sf.compose(future_time, 0, 0)
 
     def test_compose_invalid_sequence(self) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sf = _BaseSonyflake(start_time=now)
 
         invalid_sequence = 1 << sf._bits_sequence
@@ -159,7 +161,7 @@ class TestBaseSonyflake:
             sf.compose(now, invalid_sequence, 0)
 
     def test_compose_invalid_machine_id(self) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sf = _BaseSonyflake(start_time=now)
 
         invalid_machine_id = 1 << sf._bits_machine_id

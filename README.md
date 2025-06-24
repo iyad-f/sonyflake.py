@@ -24,7 +24,7 @@ by customizing the bit assignment and the time unit.
 
 ## Installation
 
-**Python 3.10 or higher is required**
+**Python 3.11 or higher is required**
 
 ### Stable
 
@@ -77,11 +77,10 @@ You can configure Sonyflake with the following options:
   if bits_machine_id is 31 or more, an error is raised.
 
 - time_unit is the time unit of Sonyflake.
-  If time_unit is not provided, the default time unit is used, which is 10msex.
+  If time_unit is not provided, the default time unit is used, which is 10msec.
   If time_unit is less than a millsecond an error is raised.
 
-- start_time is the time since which the Sonyflake time is defined as the elapsed time .
-  If start_time is not provided, the start time of the Sonyflake instance is set to "2025-01-01 00:00:00 +0000 UTC".
+- start_time is the time since which the Sonyflake time is defined as the elapsed time.
   If start_time is not before the current time an error is raised.
 
 - machine_id is the unique ID of a Sonyflake instance.

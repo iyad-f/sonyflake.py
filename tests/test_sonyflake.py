@@ -1,8 +1,10 @@
+# pyright: reportPrivateUsage=false
+
 from __future__ import annotations
 
+import concurrent.futures as cf
 import os
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 import pytest
@@ -15,7 +17,7 @@ if TYPE_CHECKING:
 
 class TestSonyflake:
     def test_next_id(self) -> None:
-        sf = Sonyflake(time_unit=timedelta(milliseconds=1), start_time=datetime.now(timezone.utc))
+        sf = Sonyflake(time_unit=timedelta(milliseconds=1), start_time=datetime.now(UTC))
 
         previous_id = sf.next_id()
         previous_time = sf._time_part(previous_id)
@@ -43,8 +45,9 @@ class TestSonyflake:
             previous_sequence = current_sequence
 
     def test_next_id_in_parallel(self) -> None:
-        sf1 = Sonyflake(machine_id=1)
-        sf2 = Sonyflake(machine_id=2)
+        start_time = datetime.now(UTC)
+        sf1 = Sonyflake(machine_id=1, start_time=start_time)
+        sf2 = Sonyflake(machine_id=2, start_time=start_time)
 
         num_cpus = os.cpu_count() or 8
         num_id = 1000
@@ -53,19 +56,19 @@ class TestSonyflake:
         def generate_ids(sf: Sonyflake) -> list[int]:
             return [sf.next_id() for _ in range(num_id)]
 
-        with ThreadPoolExecutor(max_workers=num_cpus) as executor:
+        with cf.ThreadPoolExecutor(max_workers=num_cpus) as executor:
             futures: list[Future[list[int]]] = []
             for _ in range(num_cpus // 2):
                 futures.append(executor.submit(generate_ids, sf1))
                 futures.append(executor.submit(generate_ids, sf2))
 
-            for future in as_completed(futures):
+            for future in cf.as_completed(futures):
                 for id_ in future.result():
                     assert id_ not in ids
                     ids.add(id_)
 
     def test_next_id_raises_error(self) -> None:
-        sf = Sonyflake(start_time=datetime.now(timezone.utc))
+        sf = Sonyflake(start_time=datetime.now(UTC))
         ticks_per_year = int(365 * 24 * 60 * 60 * 1e9) // sf._time_unit
 
         sf._start_time -= 174 * ticks_per_year
@@ -76,7 +79,7 @@ class TestSonyflake:
             sf.next_id()
 
     def test_to_time(self) -> None:
-        start = datetime.now(timezone.utc)
+        start = datetime.now(UTC)
         sf = Sonyflake(time_unit=timedelta(milliseconds=100), start_time=start)
 
         id_ = sf.next_id()
